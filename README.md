@@ -56,37 +56,63 @@
 
 ```text
 .
-├── Dockerfile                   # 包含 Clang, LLVM, bpftool, Go 1.26 的特权开发镜像
-├── Makefile                     # 自动化构建、代码生成与测试入口
+├── Dockerfile                   # 包含 Clang, LLVM, bpftool, Go 1.24 的特权开发镜像
+├── Makefile                     # 自动化构建、代码生成、微基准与测试入口
 ├── docker-compose.yml           # Docker-compose 声明式特权挂载配置
-├── go.mod / go.sum              # Go 依赖 (cilium/ebpf, x/sys)
+├── go.mod / go.sum              # Go 依赖 (cilium/ebpf, x/sys, prometheus)
+├── cmd/
+│   └── ebpf-agent/              # 生产级统一运维与监控 CLI 工具 (doctor/top/run/version)
+├── deploy/                      # 云原生可观测性资产 (SRE 监控告警)
+│   ├── prometheus/alerts.yml    # 内核探针告警规则 (Ringbuf 丢包、Verifier 失败、CPU 耗时超标)
+│   └── grafana/dashboard.json   # 云原生 eBPF 运行时 Grafana 监控大屏
 ├── headers/                     # 真实内核 BTF 提取的 vmlinux.h 与 libbpf 头文件
 │   ├── vmlinux.h
 │   └── bpf/ (bpf_helpers.h, bpf_endian.h, bpf_tracing.h...)
 ├── pkg/
-│   └── ebpfutil/                # 跨模块通用工具库 (环境诊断、rlimit、Verifier 分析)
-└── days/                        # 20 天递进工程案例
+│   └── ebpfutil/                # 跨模块通用工程基建 (环境诊断、特性矩阵探测、BPF Stats 自观测)
+│       └── mock/                # 确定性内核事件模拟流与故障注入引擎 (离线测试基建)
+├── scripts/
+│   └── labs/                    # 生产故障模拟与演练 Runbooks (XDP 丢包、LSM 权限拦截)
+└── days/                        # 20 天渐进式学习实战源码
     ├── day01_env/               # Day 01: 环境自检与内核准入
-    ├── day02_tracepoint/        # Day 02: Tracepoint 进程跟踪与 RingBuffer
-    ├── day03_maps/              # Day 03: BPF Maps (Hash/Array) CRUD
+    ├── day02_tracepoint/        # Day 02: Tracepoint 进程跟踪与 Fuzzing 测试
+    ├── day03_maps/              # Day 03: BPF Maps (Hash/Array) CRUD 与微基准
     ├── day04_percpu/            # Day 04: Per-CPU Map 无锁高并发统计
     ├── ...                      # Day 05 ~ Day 19
-    └── day20_agent/             # Day 20: 生产级模块化 eBPF 监控 Agent
+    └── day20_agent/             # Day 20: 生产级模块化 eBPF 监控 Agent (Prometheus + Slog + Pprof)
 ```
 
 ### 2. 常用操作指令
 
 ```bash
-# 构建特权开发测试 Docker 镜像
+# 1. 构建特权开发测试 Docker 镜像
 make docker-build
 
-# 在容器中自动执行 bpf2go 代码生成 (编译 C 内核代码并生成 Go 绑定)
+# 2. 编译生产级统一 CLI 二进制产物 (输出到 bin/ebpf-agent)
+make build-agent
+
+# 3. 执行内核环境自检与特性支持矩阵探测 (Fast-Fail 诊断)
+docker run --rm --privileged -v $(pwd):/workspace -w /workspace ebpf-dev:latest ./bin/ebpf-agent doctor
+
+# 4. 在容器中自动执行 bpf2go 代码生成 (编译 C 内核代码并生成 Go 绑定)
 make generate
 
-# 在容器中一键运行全部单元测试与内核验证
+# 5. 校验代码生成一致性 (确保提交的 Go 桩代码与 C 源码零漂移)
+make drift-check
+
+# 6. 一键运行全量单元测试与并发竞态检测 (-race)
 make test
 
-# 启动并进入具备特权的交互式容器沙箱
+# 7. 运行内核与内存纳秒级微基准测试 (Nanosecond Benchmarks & Memory Allocations)
+make bench
+
+# 8. 执行 Go 原生 Fuzzing 模糊测试 (针对内核事件解析与配置反序列化)
+make test-fuzz
+
+# 9. 以 Google SRE 生产最小特权模式 (非 --privileged，细粒度 Capabilities) 执行回归测试
+make test-least-privilege
+
+# 10. 启动并进入具备特权的交互式容器沙箱
 make docker-shell
 ```
 

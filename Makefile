@@ -1,11 +1,13 @@
 # Google Engineering Practice: 声明式、确定性构建 Makefile
-.PHONY: help build generate test test-docker docker-build docker-shell clean test-fuzz test-least-privilege drift-check lint
+.PHONY: help build generate test test-docker docker-build docker-shell clean test-fuzz test-least-privilege drift-check lint bench build-agent
 
 # 镜像名称
 IMAGE_NAME ?= ebpf-dev:latest
 DOCKER_RUN = docker run --rm --privileged \
 	--pid=host \
 	--network=host \
+	-e GOPROXY=https://goproxy.cn,direct \
+	-e GOTOOLCHAIN=local \
 	-v $(shell pwd):/workspace \
 	-v /sys/kernel/debug:/sys/kernel/debug \
 	-v /sys/kernel/btf:/sys/kernel/btf:ro \
@@ -20,6 +22,8 @@ DOCKER_RUN_LEAST_PRIVILEGE = docker run --rm \
 	--cap-add=NET_ADMIN \
 	--cap-add=SYS_ADMIN \
 	--security-opt seccomp=unconfined \
+	-e GOPROXY=https://goproxy.cn,direct \
+	-e GOTOOLCHAIN=local \
 	-v $(shell pwd):/workspace \
 	-v /sys/fs/bpf:/sys/fs/bpf \
 	-v /sys/kernel/btf:/sys/kernel/btf:ro \
@@ -57,6 +61,12 @@ test-fuzz: ## 执行 Go 原生 Fuzzing 模糊测试 (冒烟探测各模块纯解
 
 test-least-privilege: ## 以 Google SRE 最小特权模式 (非 privileged) 执行生产级回归测试
 	$(DOCKER_RUN_LEAST_PRIVILEGE) go test -v ./days/day20_agent/... ./pkg/...
+
+bench: ## 运行微基准测试 (Nanosecond Benchmarks & Memory Allocations)
+	$(DOCKER_RUN) go test -run=^$$ -bench=. -benchmem ./days/day03_maps/... ./days/day06_ringbuf/... ./days/day10_xdp_parse/...
+
+build-agent: ## 编译统一的生产级 CLI 二进制
+	$(DOCKER_RUN) go build -v -o bin/ebpf-agent ./cmd/ebpf-agent
 
 test-local: ## 在本地执行轻量级非特权测试 (跳过需 Linux 内核的测试)
 	go test -v ./pkg/...

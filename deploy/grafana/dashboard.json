@@ -1,0 +1,112 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Google SRE eBPF 四大黄金指标 (Traffic, Latency, Errors, Saturation)",
+      "type": "row"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "line", "lineInterpolation": "smooth" },
+          "unit": "ops"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "title": "内核捕获事件吞吐率 (Traffic QPS)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (plugin) (rate(ebpf_agent_events_total[1m]))",
+          "legendFormat": "{{plugin}} - 处理速率"
+        }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "line" },
+          "unit": "ops"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "title": "RingBuffer 丢包速率 (Errors / Backpressure Drops)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (plugin) (rate(ebpf_agent_events_dropped_total[1m]))",
+          "legendFormat": "{{plugin}} - 丢弃速率"
+        }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "line" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "id": 3,
+      "title": "内核到用户态传输延迟 P99 (Latency)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, plugin) (rate(ebpf_agent_events_latency_seconds_bucket[5m])))",
+          "legendFormat": "{{plugin}} - P99 延迟"
+        }
+      ]
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "line" },
+          "unit": "percentunit",
+          "max": 1.0,
+          "min": 0.0
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "id": 4,
+      "title": "BPF Map 容量占用率 (Saturation)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "ebpf_agent_map_utilization_ratio",
+          "legendFormat": "{{map_name}} 占用率"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["ebpf", "google-sre", "cilium"],
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "title": "eBPF 生产级可观测性与安全仪表盘",
+  "uid": "ebpf-agent-overview"
+}

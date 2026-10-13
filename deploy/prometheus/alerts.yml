@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# Google SRE eBPF 生产级告警规则 (Prometheus Alert Rules)
+
+groups:
+  - name: ebpf_agent_alerts
+    rules:
+      - alert: EBPFProbeDroppedEventsHigh
+        expr: rate(ebpf_agent_events_dropped_total[2m]) > 5
+        for: 1m
+        labels:
+          severity: critical
+          service: ebpf-agent
+        annotations:
+          summary: "eBPF 探针事件高频丢失 (实例: {{ $labels.instance }})"
+          description: "插件 {{ $labels.plugin }} 在过去 2 分钟内每秒丢包率超过 5 个，表明 RingBuffer 或用户态处理循环发生背压拥塞。"
+
+      - alert: EBPFMapUtilizationCritical
+        expr: ebpf_agent_map_utilization_ratio > 0.85
+        for: 2m
+        labels:
+          severity: warning
+          service: ebpf-agent
+        annotations:
+          summary: "BPF Map 容量占用率超阈值 (Map: {{ $labels.map_name }})"
+          description: "BPF Map {{ $labels.map_name }} 当前槽位占用率达到 {{ $value | humanizePercentage }}，逼近内核容量极限，可能引发新增元素插入失败 (E2BIG)。"
+
+      - alert: EBPFAgentUnhealthy
+        expr: probe_success{job="ebpf-agent"} == 0
+        for: 30s
+        labels:
+          severity: page
+          service: ebpf-agent
+        annotations:
+          summary: "eBPF Agent /healthz 健康探针失败"
+          description: "Agent 实例 {{ $labels.instance }} 未能响应健康检测，可能探针异常退出或发生内核死锁。"

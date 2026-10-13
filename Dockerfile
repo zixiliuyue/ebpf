@@ -3,9 +3,9 @@
 FROM golang:1.24-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV GOPROXY=https://proxy.golang.org,direct
-# 启用 GOTOOLCHAIN=auto，确保与 cilium/ebpf v0.22+ 要求的 Go 版本自适应对齐
-ENV GOTOOLCHAIN=auto
+ENV GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
+# 锁定本地已安装的 Go 工具链，防止自动拉取远程 toolchain 导致环境漂移或网络超时
+ENV GOTOOLCHAIN=local
 
 # 安装 eBPF 编译器工具链、内核调试工具与网络排错工具
 RUN apt-get update && apt-get install -y --no-install-recommends \
