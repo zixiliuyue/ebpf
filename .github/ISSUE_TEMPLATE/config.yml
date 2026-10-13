@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 课程设计与架构文档
+    url: https://github.com/zixiliuyue/ebpf#readme
+    about: 请先查阅根目录 README.md 与各个 Day 目录中的架构说明。

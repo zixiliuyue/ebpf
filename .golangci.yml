@@ -1,0 +1,60 @@
+# Google 软件工程实践：静态代码分析与门禁规范 (golangci-lint 配置)
+run:
+  timeout: 5m
+  tests: true
+  # 跳过 bpf2go 自动生成的 eBPF 桩代码目录与文件
+  skip-dirs:
+    - vendor
+  skip-files:
+    - ".*_bpfel\\.go$"
+    - ".*_bpfeb\\.go$"
+
+linters-settings:
+  govet:
+    check-shadowing: true
+    enable-all: false
+  errcheck:
+    # 强制检查未经忽略的错误返回值
+    check-type-assertions: true
+    check-blank: false
+  gosec:
+    # 针对安全漏洞进行审计 (如整数溢出、不安全的指针转换等)
+    severity: "medium"
+    confidence: "medium"
+    excludes:
+      - G104 # 允许部分受控的未处理错误 (通过注释或单元测试处理)
+      - G103 # eBPF 开发中难以完全避免 unsafe.Pointer / syscall 调用
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+      - name: error-strings
+        disabled: false
+      - name: var-naming
+        disabled: false
+  staticcheck:
+    checks: ["all"]
+
+linters:
+  disable-all: true
+  enable:
+    - govet         # Go 官方标准静态语法检查
+    - errcheck      # 未捕获错误分析
+    - staticcheck   # 高级代码逻辑与规范检查
+    - unused        # 未使用符号检测
+    - ineffassign   # 无效赋值检测
+    - gosec         # 生产级安全漏洞扫描
+    - misspell      # 常见英语拼写错误检查
+    - revive        # 现代可替换 golint 的代码风格检查
+    - unconvert     # 冗余类型转换检测
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # 针对测试代码放宽部分严格限制 (允许 mock 常量、测试断言等)
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck

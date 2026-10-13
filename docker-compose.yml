@@ -1,0 +1,51 @@
+version: '3.8'
+
+# Google Engineering Practice: 一键式环境配置
+# 通过 docker-compose 声明特权级能力与内核虚拟文件系统挂载，保证任意开发者本地开箱即跑
+services:
+  ebpf-workspace:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ebpf-dev:latest
+    container_name: ebpf-learning-box
+    privileged: true
+    pid: host
+    network_mode: host
+    volumes:
+      - .:/workspace
+      - /sys/kernel/debug:/sys/kernel/debug
+      - /sys/kernel/btf:/sys/kernel/btf:ro
+      - /sys/fs/bpf:/sys/fs/bpf
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  # Google SRE 生产级最小特权模式 (Least Privilege)
+  # 彻底摒弃粗暴的 privileged: true，采用 Linux 5.8+ 标准解耦 Capabilities 与只读最小挂载
+  ebpf-least-privilege:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ebpf-dev:latest
+    container_name: ebpf-least-privilege-box
+    cap_drop:
+      - ALL
+    cap_add:
+      - BPF         # 加载 eBPF 程序与创建 BPF Map (Linux 5.8+)
+      - PERFMON     # 挂载性能跟踪探针 (tracepoint, kprobe, uprobe, perf_event)
+      - NET_ADMIN   # 网络层 hook 挂载与流量劫持 (XDP, TC, cgroup sock)
+      - SYS_ADMIN   # 兼容系统级调用与部分内核回退能力
+    security_opt:
+      - seccomp:unconfined # 允许 bpf() 系统调用不受默认 seccomp 白名单限制
+    volumes:
+      - .:/workspace
+      - /sys/fs/bpf:/sys/fs/bpf          # BPF Map Pinning 所需文件系统
+      - /sys/kernel/btf:/sys/kernel/btf:ro # 只读内核 BTF 元数据
+      - /sys/kernel/debug:/sys/kernel/debug:ro # 只读 debugfs (仅跟踪所需)
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+

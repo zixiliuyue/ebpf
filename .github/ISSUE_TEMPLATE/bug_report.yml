@@ -1,0 +1,42 @@
+name: 🐞 Bug 报告
+description: 创建一个错误报告以帮助我们修复项目中的问题
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您提交 Bug 报告！在提交前，请先搜索现有的 Issue 以避免重复。
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 请清晰且简明地描述该 Bug 是什么。
+      placeholder: 在运行 Day XX 的模块时遇到了...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 请详细列出复现此问题的步骤。
+      placeholder: |
+        1. 启动容器：make docker-shell
+        2. 运行命令：cd days/dayXX_xxx && go test -v .
+        3. 观察到输出：...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误日志与终端输出
+      description: 请粘贴完整的控制台报错或内核 dmesg 输出。
+      render: shell
+  - type: input
+    id: environment
+    attributes:
+      label: 运行环境
+      description: Linux 发行版与内核版本（如 Ubuntu 22.04 / Linux 5.15+）、Docker 版本与 Go 版本。
+      placeholder: Linux 5.15.0-generic, Go 1.22, cilium/ebpf v0.12.3
+    validations:
+      required: true

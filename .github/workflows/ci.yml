@@ -1,0 +1,124 @@
+# Google 软件工程实践：自动化 CI 门禁流水线
+# 覆盖静态检查、生成物一致性校验 (Codegen Drift Check)、单元测试、Fuzzing 模糊测试与最小特权校验
+
+name: eBPF Continuous Integration
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  # 阶段 1: 代码静态扫描与语法规范检查
+  lint:
+    name: GolangCI Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Go 运行环境
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: 执行 golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
+          args: --config=.golangci.yml --timeout=5m
+
+  # 阶段 2: 代码生成物一致性校验 (防止开发者修改 C 代码后漏跑 bpf2go 导致产物漂移)
+  codegen-drift-check:
+    name: Codegen Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 LLVM/Clang 与 Linux 头文件
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libbpf-dev linux-libc-dev
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: 重新执行代码生成
+        run: |
+          go generate ./...
+
+      - name: 检查 Git 工作区是否存在未提交的生成物漂移
+        run: |
+          if ! git diff --exit-code; then
+            echo "[错误] 检测到本地提交的 eBPF 桩代码与最新 C 源码不一致！"
+            echo "请在本地运行 'make generate' 或 'go generate ./...' 并提交更新后的代码。"
+            exit 1
+          fi
+
+  # 阶段 3: 自动化测试与 Fuzzing 模糊测试
+  test-and-fuzz:
+    name: Unit Test & Fuzzing
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 构建 eBPF 开发与测试 Docker 镜像
+        run: |
+          docker build -t ebpf-dev:latest .
+
+      - name: 执行全量单元测试 (并发竞态检测 -race)
+        run: |
+          docker run --rm --privileged \
+            --pid=host \
+            --network=host \
+            -v ${{ github.workspace }}:/workspace \
+            -v /sys/kernel/debug:/sys/kernel/debug \
+            -v /sys/kernel/btf:/sys/kernel/btf:ro \
+            -v /sys/fs/bpf:/sys/fs/bpf \
+            -w /workspace ebpf-dev:latest \
+            go test -v -race -timeout 180s ./...
+
+      - name: 执行 Day 02 进程事件解析 Fuzzing 模糊测试 (冒烟探测 15s)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ebpf-dev:latest \
+            go test -v -fuzz=FuzzParseProcessEvent -fuzztime=15s ./days/day02_tracepoint/...
+
+      - name: 执行 Day 10 XDP 网络报文解析 Fuzzing 模糊测试 (冒烟探测 15s)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ebpf-dev:latest \
+            go test -v -fuzz=FuzzParseUDPv4Packet -fuzztime=15s ./days/day10_xdp_parse/...
+
+      - name: 执行 Day 20 Agent 动态配置反序列化 Fuzzing 模糊测试 (冒烟探测 15s)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ebpf-dev:latest \
+            go test -v -fuzz=FuzzConfigParsing -fuzztime=15s ./days/day20_agent/...
+
+  # 阶段 4: 最小特权 (Least Privilege) 验证
+  least-privilege-check:
+    name: Least Privilege Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 构建 Docker 镜像
+        run: |
+          docker build -t ebpf-dev:latest .
+
+      - name: 验证以细粒度特权 (CAP_BPF / CAP_PERFMON / CAP_NET_ADMIN / CAP_SYS_ADMIN) 运行测试
+        run: |
+          docker run --rm \
+            --cap-add=BPF \
+            --cap-add=PERFMON \
+            --cap-add=NET_ADMIN \
+            --cap-add=SYS_ADMIN \
+            -v ${{ github.workspace }}:/workspace \
+            -v /sys/fs/bpf:/sys/fs/bpf \
+            -w /workspace ebpf-dev:latest \
+            go test -v ./days/day20_agent/... ./pkg/...
